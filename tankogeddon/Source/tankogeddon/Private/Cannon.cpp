@@ -5,6 +5,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/ArrowComponent.h"
 #include "Components/SceneComponent.h"
+#include "Projectile.h"
 
 ACannon::ACannon()
 {
@@ -27,6 +28,7 @@ void ACannon::BeginPlay()
 
 void ACannon::Fire()
 {
+	UE_LOG(LogTemp, Warning, TEXT("Count patricy : %f"), CountProjectile);
 	if (CountProjectile <= 0) {
 		GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, FString::Printf(TEXT("clip is empty")));
 		return;
@@ -36,13 +38,37 @@ void ACannon::Fire()
 		return;
 	}
 	bReadyToFire = false;
-	if (CannonType == ECannonType::FireProjectile) 
+	if (CannonType == ECannonType::FireProjectile)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, FString::Printf(TEXT("FireProjectile")));
+		AProjectile* projectile = GetWorld()->SpawnActor<AProjectile>(ProjectileClass, ProjectileSpawnPoint->GetComponentLocation(), ProjectileSpawnPoint->GetComponentRotation());
+		if (projectile)
+		{
+			projectile->Start();
+		}
 	}
 	else 
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, FString::Printf(TEXT("FireTrace")));
+		FHitResult hitResult;
+		FCollisionQueryParams traceParams;
+		traceParams.bTraceComplex = true;
+		traceParams.bReturnPhysicalMaterial = false;
+
+		FVector Start = ProjectileSpawnPoint->GetComponentLocation();
+		FVector End = Start + ProjectileSpawnPoint->GetForwardVector() * FireRange;
+		if (GetWorld()->LineTraceSingleByChannel(hitResult, Start, End, ECollisionChannel::ECC_Visibility, traceParams))
+		{
+			DrawDebugLine(GetWorld(), Start, hitResult.Location, FColor::Purple, false, 1.0f, 0, 5.0f);
+			if (hitResult.GetActor())
+			{
+				UE_LOG(LogTemp, Warning, TEXT("currentLocation: %s"), *hitResult.GetActor()->GetName());
+				hitResult.GetActor()->Destroy();
+			}
+		}
+		else {
+			DrawDebugLine(GetWorld(), Start, End, FColor::Red, false, 1.0f, 0, 5.0f);
+		}
 	}
 	CountProjectile--;
 	GetWorld()->GetTimerManager().SetTimer(ReloadTimer, this, &ACannon::Reload, 1 / FireRate, false);
@@ -83,4 +109,9 @@ void ACannon::Reload()
 {
 	bReadyToFire = true;
 	countQFire = 0;
+}
+
+void ACannon::AddCountProjectile(float AddCountProjectile)
+{
+	CountProjectile += AddCountProjectile;
 }

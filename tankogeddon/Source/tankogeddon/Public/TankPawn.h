@@ -22,9 +22,11 @@ public:
 	void MoveRight(float Value);
 	void RotateRight(float Value);
 
-	void SetupCannon();
+	void SetupCannon(TSubclassOf<ACannon> newCannon);
 	void Fire();
 	void FireSpecial();
+	void ChangeCannon();
+	void AddCountProjectile(float CountProjectile);
 
 protected:
 	// Called when the game starts or when spawned
@@ -52,6 +54,12 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cannon")
 	ACannon* Cannon;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cannon")
+	ACannon* CannonSecond;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cannon")
+	TSubclassOf<ACannon> CannonSecondClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
 	float MovementSpeed = 100.0f;

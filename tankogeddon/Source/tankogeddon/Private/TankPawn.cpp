@@ -42,7 +42,12 @@ void ATankPawn::BeginPlay()
 {
 	Super::BeginPlay();
 	TankController = Cast<ATankPlayerController>(GetController());
-	SetupCannon();
+	SetupCannon(CannonClass);
+	FActorSpawnParameters params;
+	params.Instigator = this;
+	params.Owner = this;
+	CannonSecond = GetWorld()->SpawnActor<ACannon>(CannonSecondClass, params);
+	CannonSecond->AttachToComponent(CannonSetupPoint, FAttachmentTransformRules::SnapToTargetIncludingScale);
 }
 
 void ATankPawn::Tick(float DeltaTime)
@@ -93,9 +98,9 @@ void ATankPawn::RotateRight(float Value)
 	RotateRightAxisValue = Value;
 }
 
-void ATankPawn::SetupCannon()
+void ATankPawn::SetupCannon(TSubclassOf<ACannon> newCannon)
 {
-	if (!CannonClass)
+	if (!newCannon)
 	{
 		return;
 	}
@@ -106,7 +111,7 @@ void ATankPawn::SetupCannon()
 	FActorSpawnParameters params;
 	params.Instigator = this;
 	params.Owner = this;
-	Cannon = GetWorld()->SpawnActor<ACannon>(CannonClass, params);
+	Cannon = GetWorld()->SpawnActor<ACannon>(newCannon, params);
 	Cannon->AttachToComponent(CannonSetupPoint, FAttachmentTransformRules::SnapToTargetIncludingScale);
 }
 
@@ -123,5 +128,20 @@ void ATankPawn::FireSpecial()
 	if (Cannon)
 	{
 		Cannon->FireSpecial();
+	}
+}
+
+void ATankPawn::ChangeCannon()
+{
+	auto TempCannon = Cannon;
+	Cannon = CannonSecond;
+	CannonSecond = TempCannon;
+}
+
+void ATankPawn::AddCountProjectile(float CountProjectile)
+{
+	if (Cannon)
+	{
+		Cannon->AddCountProjectile(CountProjectile);
 	}
 }
