@@ -28,7 +28,7 @@ void ACannon::BeginPlay()
 
 void ACannon::Fire()
 {
-	UE_LOG(LogTemp, Warning, TEXT("Count patricy : %f"), CountProjectile);
+	//UE_LOG(LogTemp, Warning, TEXT("Count patricy : %f"), CountProjectile);
 	if (CountProjectile <= 0) {
 		GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, FString::Printf(TEXT("clip is empty")));
 		return;
@@ -44,6 +44,7 @@ void ACannon::Fire()
 		AProjectile* projectile = GetWorld()->SpawnActor<AProjectile>(ProjectileClass, ProjectileSpawnPoint->GetComponentLocation(), ProjectileSpawnPoint->GetComponentRotation());
 		if (projectile)
 		{
+			UE_LOG(LogTemp, Warning, TEXT("Turret faer 2"));
 			projectile->Start();
 		}
 	}

@@ -36,6 +36,10 @@ ATankPawn::ATankPawn()
 
 	CannonSetupPoint = CreateDefaultSubobject<UArrowComponent>(TEXT("CannonSetupPoint"));
 	CannonSetupPoint->SetupAttachment(TurretMesh);
+
+	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
+	HealthComponent->OnDie.AddUObject(this, &ATankPawn::Destroyed);
+	HealthComponent->OnHealthChanged.AddUObject(this, &ATankPawn::DamageTaked);
 }
 
 void ATankPawn::BeginPlay()
@@ -144,4 +148,23 @@ void ATankPawn::AddCountProjectile(float CountProjectile)
 	{
 		Cannon->AddCountProjectile(CountProjectile);
 	}
+}
+
+void ATankPawn::TakeDamage(FDamageData DamageData)
+{
+	HealthComponent->TakeDamage(DamageData);
+}
+
+void ATankPawn::Die()
+{
+	if (Cannon)
+	{
+		Cannon->Destroy();
+	}
+	Destroy();
+}
+
+void ATankPawn::DamageTaked(float Value)
+{
+	UE_LOG(LogTemp, Warning, TEXT("Tank %s taked damage %f, heals %f"), *GetName(), Value, HealthComponent->GetHealth());
 }
