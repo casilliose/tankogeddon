@@ -24,6 +24,7 @@ void ATankPlayerController::SetupInputComponent()
 	InputComponent->BindAxis("RotateRight", this, &ATankPlayerController::RotateRight);
 	InputComponent->BindAction("Fire", EInputEvent::IE_Pressed, this, &ATankPlayerController::Fire);
 	InputComponent->BindAction("FireSpecial", EInputEvent::IE_Pressed, this, &ATankPlayerController::FireSpecial);
+	InputComponent->BindAction("ChangeCannon", EInputEvent::IE_Pressed, this, &ATankPlayerController::ChangeCannon);
 }
 
 void ATankPlayerController::Tick(float DeltaSeconds)
@@ -31,11 +32,14 @@ void ATankPlayerController::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	FVector MouseDirection;
 	DeprojectMousePositionToWorld(MousePos, MouseDirection);
-	FVector TankPosition = TankPawn->GetActorLocation();
-	MousePos.Z = TankPosition.Z;
-	FVector dir = MousePos - TankPosition;
-	dir.Normalize();
-	MousePos = TankPosition + dir * 1000;
+	if (TankPawn)
+	{
+		FVector TankPosition = TankPawn->GetActorLocation();
+		MousePos.Z = TankPosition.Z;
+		FVector dir = MousePos - TankPosition;
+		dir.Normalize();
+		MousePos = TankPosition + dir * 1000;
+	}
 	//DrawDebugLine(GetWorld(), TankPosition, MousePos, FColor::Green, false, 0.1f, 0, 5);
 }
 
@@ -76,5 +80,13 @@ void ATankPlayerController::FireSpecial()
 	if (TankPawn)
 	{
 		TankPawn->FireSpecial();
+	}
+}
+
+void ATankPlayerController::ChangeCannon()
+{
+	if (TankPawn)
+	{
+		TankPawn->ChangeCannon();
 	}
 }

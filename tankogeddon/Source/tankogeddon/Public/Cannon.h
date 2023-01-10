@@ -19,6 +19,7 @@ public:
 	void Reload();
 	void FireSpecial();
 	void FireQ();
+	void AddCountProjectile(float CountProjectile);
 
 	FTimerHandle ReloadTimer;
 	FTimerHandle QTimer;
@@ -34,6 +35,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
 	ECannonType CannonType = ECannonType::FireProjectile;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Components")
+	TSubclassOf<class AProjectile> ProjectileClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fire Params")
 	float FireRate = 1.0f;
@@ -52,6 +56,7 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fire Params")
 	float IntervalBetweenFireInQ = 0.3f;
+
 
 private:
 	bool bReadyToFire = false;
