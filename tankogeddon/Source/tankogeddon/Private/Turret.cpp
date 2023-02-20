@@ -11,19 +11,6 @@
 
 ATurret::ATurret()
 {
-	PrimaryActorTick.bCanEverTick = true;
-	HitCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("BoxCollision"));
-	RootComponent = HitCollision;
-
-	BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
-	BodyMesh->SetupAttachment(HitCollision);
-
-	TurretMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TurretMesh"));
-	TurretMesh->SetupAttachment(BodyMesh);
-
-	CannonSetupPoint = CreateDefaultSubobject<UArrowComponent>(TEXT("CannonSetupPoint"));
-	CannonSetupPoint->SetupAttachment(TurretMesh);
-
 	UStaticMesh* bodyMeshTemp = LoadObject<UStaticMesh>(this, *BodyMeshPath);
 	if (bodyMeshTemp)
 	{
@@ -36,23 +23,15 @@ ATurret::ATurret()
 		TurretMesh->SetStaticMesh(turretMeshTemp);
 	}
 
-	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
 	HealthComponent->OnDie.AddUObject(this, &ATurret::Destroyed);
 	HealthComponent->OnHealthChanged.AddUObject(this, &ATurret::DamageTaked);
 }
 
-void ATurret::TakeDamage(FDamageData DamageData)
-{
-	HealthComponent->TakeDamage(DamageData);
-}
-
-
 void ATurret::BeginPlay()
 {
 	Super::BeginPlay();
-	SetupCannon();
+	SetupCannon(CannonClass);
 	PlayerPawn = GetWorld()->GetFirstPlayerController()->GetPawn();
-	FTimerHandle targetingTimerHandle;
 	GetWorld()->GetTimerManager().SetTimer(targetingTimerHandle, this, &ATurret::Targeting, TargetingRate, true, TargetingRate);
 }
 
@@ -62,6 +41,11 @@ void ATurret::Targeting()
 	{
 		return;
 	}
+
+	if (!IsPlayerSeen()) {
+		return;
+	}
+		
 	if (IsPlayerInRange())
 	{
 		RotateToPlayer();
@@ -73,15 +57,6 @@ void ATurret::Targeting()
 			}
 		}
 	}
-}
-
-void ATurret::Destroyed()
-{
-	if (Cannon)
-	{
-		Cannon->Destroy();
-	}
-	Destroy();
 }
 
 void ATurret::RotateToPlayer()
@@ -108,28 +83,32 @@ bool ATurret::CanFire()
 	return AimAngle <= Accurency;
 }
 
-void ATurret::Fire()
+float ATurret::GetScore()
 {
-	if (Cannon)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Turret faer"));
-		Cannon->Fire();
-	}
+	return ScoreValue;
 }
 
-void ATurret::SetupCannon()
+bool ATurret::IsPlayerSeen()
 {
-	if (!CannonClass)
+	FVector playerPos = PlayerPawn->GetActorLocation();
+	FVector eyesPos = CannonSetupPoint->GetComponentLocation();
+	FHitResult hitResult;
+	FCollisionQueryParams traceParams = FCollisionQueryParams(FName(TEXT("FireTrace")), true, this);
+	traceParams.bTraceComplex = true;
+	traceParams.AddIgnoredActor(Cannon);
+	traceParams.bReturnPhysicalMaterial = false;
+	if (GetWorld()->LineTraceSingleByChannel(hitResult, eyesPos, playerPos, ECollisionChannel::ECC_Visibility, traceParams))
 	{
-		return;
+		if (hitResult.GetActor())
+		{
+			return hitResult.GetActor() == PlayerPawn;
+		}
 	}
-	FActorSpawnParameters params;
-	params.Owner = this;
-	Cannon = GetWorld()->SpawnActor<ACannon>(CannonClass, params);
-	Cannon->AttachToComponent(CannonSetupPoint, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+	return false;
 }
 
-void ATurret::DamageTaked(float Value)
+void ATurret::DieEffect()
 {
-	UE_LOG(LogTemp, Warning, TEXT("Turret %s taked damage %f, heals %f"), *GetName(), Value, HealthComponent->GetHealth());
+	PrimaryActorTick.bCanEverTick = false;
+	GetWorldTimerManager().ClearTimer(targetingTimerHandle);
 }

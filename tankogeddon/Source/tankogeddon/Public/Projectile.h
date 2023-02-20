@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "Components/SphereComponent.h"
 #include "Components/SceneComponent.h"
+#include "ScoreComponent.h"
 #include "Projectile.generated.h"
 
 UCLASS()
@@ -15,12 +16,12 @@ class TANKOGEDDON_API AProjectile : public AActor
 	
 public:	
 	AProjectile();
-	void Start();
+	virtual void Start();
 
 	FTimerHandle MoveTimer;
 
 protected:
-	void Move();
+	virtual void Move();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Component")
 	class UStaticMeshComponent* ProjectileMesh;
@@ -37,6 +38,13 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Component")
 	float Damage = 1.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Component")
+	class UScoreComponent* ScoreComponent;
+
 	UFUNCTION()
 	void OnMeshOverlapBegin(class UPrimitiveComponent* OverlappedComp, class AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Damage")
+	float PushForce = 1000;
+
 };

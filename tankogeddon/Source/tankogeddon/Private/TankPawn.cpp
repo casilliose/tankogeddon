@@ -10,20 +10,16 @@
 #include "Components/StaticMeshComponent.h"
 #include "Cannon.h"
 #include "Components/ArrowComponent.h"
+#include "GameFramework/ForceFeedbackEffect.h"
+#include "Particles/ParticleSystemComponent.h"
+#include "Components/Widget.h"
+#include "HPWidget.h"
+#include "Components/WidgetComponent.h"
+#include "Components/AudioComponent.h"
+
 
 ATankPawn::ATankPawn()
 {
-	PrimaryActorTick.bCanEverTick = true;
-
-	BoxCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("BoxCollision"));
-	RootComponent = BoxCollision;
-
-	BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
-	BodyMesh->SetupAttachment(BoxCollision);
-
-	TurretMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TurretMesh"));
-	TurretMesh->SetupAttachment(BodyMesh);
-
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
 	SpringArm->SetupAttachment(BoxCollision);
 	SpringArm->bDoCollisionTest = false;
@@ -34,12 +30,22 @@ ATankPawn::ATankPawn()
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(SpringArm);
 
-	CannonSetupPoint = CreateDefaultSubobject<UArrowComponent>(TEXT("CannonSetupPoint"));
-	CannonSetupPoint->SetupAttachment(TurretMesh);
-
-	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
 	HealthComponent->OnDie.AddUObject(this, &ATankPawn::Destroyed);
 	HealthComponent->OnHealthChanged.AddUObject(this, &ATankPawn::DamageTaked);
+
+	ScoreComponent = CreateDefaultSubobject<UScoreComponent>(TEXT("ScoreComponent"));
+	ScoreComponent->OnDestroyProjectile.AddUObject(this, &ATankPawn::AddScore);
+
+	ShootEffect = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("Shoot effect"));
+	ShootEffect->SetupAttachment(BodyMesh);
+
+	AudioEffect = CreateDefaultSubobject<UAudioComponent>(TEXT("Audio effect"));
+	AudioEffect->SetupAttachment(BodyMesh);
+
+	//WidgetComp = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBar"));
+	//WidgetComp->SetWidgetClass(HealthWidget);
+	//UHPWidget* HpProgress = Cast<UHPWidget>(WidgetComp->GetUserWidgetObject());
+	//HpProgress->setCurrentHP(100.f);
 }
 
 void ATankPawn::BeginPlay()
@@ -58,14 +64,11 @@ void ATankPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	FVector currentLocation = GetActorLocation();
-	//UE_LOG(LogTemp, Warning, TEXT("currentLocation: %s"), *currentLocation.ToString());
 	FVector ForwardVector = GetActorForwardVector();
-	//UE_LOG(LogTemp, Warning, TEXT("ForwardVector: %s"), *ForwardVector.ToString());
 	FVector movePosition = currentLocation + ForwardVector * MovementSpeed * ForwardMoveAxisValue * DeltaTime;
 	FVector RightVector = GetActorRightVector();
-	//UE_LOG(LogTemp, Warning, TEXT("RightVector: %s"), *RightVector.ToString());
+
 	movePosition = movePosition + RightVector * MovementSpeed * RightMoveAxisValue * DeltaTime;
-	//UE_LOG(LogTemp, Warning, TEXT("movePosition: %s"), *movePosition.ToString());
 	SetActorLocation(movePosition);
 	
 	CurrentRightAxisValue = FMath::Lerp(CurrentRightAxisValue, RotateRightAxisValue, RotateInterpolationKey);
@@ -77,11 +80,7 @@ void ATankPawn::Tick(float DeltaTime)
 
 	if (TankController) {
 		FVector MousePos = TankController->GetMousePos();
-		FRotator targetRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), MousePos);
-		FRotator turretRotation = TurretMesh->GetComponentRotation();
-		targetRotation.Pitch = turretRotation.Pitch;
-		targetRotation.Roll = turretRotation.Roll;
-		TurretMesh->SetWorldRotation(FMath::Lerp(targetRotation, turretRotation, TurretInterpolationKey));
+		RotateTurretTo(MousePos);
 	}
 }
 
@@ -100,31 +99,6 @@ void ATankPawn::MoveRight(float Value)
 void ATankPawn::RotateRight(float Value)
 {
 	RotateRightAxisValue = Value;
-}
-
-void ATankPawn::SetupCannon(TSubclassOf<ACannon> newCannon)
-{
-	if (!newCannon)
-	{
-		return;
-	}
-	if (Cannon)
-	{
-		Cannon->Destroy();
-	}
-	FActorSpawnParameters params;
-	params.Instigator = this;
-	params.Owner = this;
-	Cannon = GetWorld()->SpawnActor<ACannon>(newCannon, params);
-	Cannon->AttachToComponent(CannonSetupPoint, FAttachmentTransformRules::SnapToTargetIncludingScale);
-}
-
-void ATankPawn::Fire()
-{
-	if (Cannon)
-	{
-		Cannon->Fire();
-	}
 }
 
 void ATankPawn::FireSpecial()
@@ -150,21 +124,67 @@ void ATankPawn::AddCountProjectile(float CountProjectile)
 	}
 }
 
-void ATankPawn::TakeDamage(FDamageData DamageData)
+void ATankPawn::AddScore(float Value)
 {
-	HealthComponent->TakeDamage(DamageData);
+	Score += Value;
 }
 
-void ATankPawn::Die()
+TArray<FVector> ATankPawn::GetPatrollingPoints()
 {
-	if (Cannon)
+	TArray<FVector> points;
+	for (ATargetPoint* point : PatrollingPoints)
 	{
-		Cannon->Destroy();
+		points.Add(point->GetActorLocation());
 	}
-	Destroy();
+	return points;
 }
 
-void ATankPawn::DamageTaked(float Value)
+void ATankPawn::SetPatrollingPoints(TArray<ATargetPoint*> NewPatrollingPoints)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Tank %s taked damage %f, heals %f"), *GetName(), Value, HealthComponent->GetHealth());
+	PatrollingPoints = NewPatrollingPoints;
+}
+
+FVector ATankPawn::GetTurretForwardVector()
+{
+	return TurretMesh->GetForwardVector();
+}
+
+void ATankPawn::RotateTurretTo(FVector TargetPosition)
+{
+	FRotator targetRotation = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), TargetPosition);
+	FRotator currRotation = TurretMesh->GetComponentRotation();
+	targetRotation.Pitch = currRotation.Pitch;
+	targetRotation.Roll = currRotation.Roll;
+	TurretMesh->SetWorldRotation(FMath::Lerp(currRotation, targetRotation, TurretInterpolationKey));
+}
+
+FVector ATankPawn::GetEyesPosition()
+{
+	return CannonSetupPoint->GetComponentLocation();
+}
+
+void ATankPawn::DieEffect()
+{
+	if (!TankController) {
+		PrimaryActorTick.bCanEverTick = false;
+		setDie();
+		if (this->GetController()) {
+			this->GetController()->StopMovement();
+		}
+		SetActorTickEnabled(false);
+	}
+	else 
+	{
+		this->setDie();
+	}
+}
+
+bool ATankPawn::isDie()
+{
+	return isDieTank;
+}
+
+void ATankPawn::setDie()
+{
+	isDieTank = true;
 }

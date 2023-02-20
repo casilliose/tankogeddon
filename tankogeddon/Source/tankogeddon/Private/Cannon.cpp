@@ -6,6 +6,8 @@
 #include "Components/ArrowComponent.h"
 #include "Components/SceneComponent.h"
 #include "Projectile.h"
+#include "GameStruct.h"
+#include "DamageTaker.h"
 
 ACannon::ACannon()
 {
@@ -18,6 +20,12 @@ ACannon::ACannon()
 	
 	ProjectileSpawnPoint = CreateDefaultSubobject<UArrowComponent>(TEXT("ProjectileSpawnPoint"));
 	ProjectileSpawnPoint->SetupAttachment(CannonMesh);
+
+	ShootEffect = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("Shoot effect"));
+	ShootEffect->SetupAttachment(ProjectileSpawnPoint);
+
+	AudioEffect = CreateDefaultSubobject<UAudioComponent>(TEXT("Audio effect"));
+	AudioEffect->SetupAttachment(ProjectileSpawnPoint);
 }
 
 void ACannon::BeginPlay()
@@ -38,13 +46,15 @@ void ACannon::Fire()
 		return;
 	}
 	bReadyToFire = false;
+	ShootEffect->ActivateSystem();
+	AudioEffect->Play();
+
 	if (CannonType == ECannonType::FireProjectile)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Red, FString::Printf(TEXT("FireProjectile")));
 		AProjectile* projectile = GetWorld()->SpawnActor<AProjectile>(ProjectileClass, ProjectileSpawnPoint->GetComponentLocation(), ProjectileSpawnPoint->GetComponentRotation());
 		if (projectile)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Turret faer 2"));
 			projectile->Start();
 		}
 	}
@@ -63,8 +73,22 @@ void ACannon::Fire()
 			DrawDebugLine(GetWorld(), Start, hitResult.Location, FColor::Purple, false, 1.0f, 0, 5.0f);
 			if (hitResult.GetActor())
 			{
-				UE_LOG(LogTemp, Warning, TEXT("currentLocation: %s"), *hitResult.GetActor()->GetName());
-				hitResult.GetActor()->Destroy();
+				//UE_LOG(LogTemp, Warning, TEXT("currentLocation: %s"), *hitResult.GetActor()->GetName());
+				if (hitResult.GetActor())
+				{
+					IDamageTaker* DamageTakerActor = Cast<IDamageTaker>(hitResult.GetActor());
+					if (DamageTakerActor) {
+						FDamageData damageData;
+						damageData.DamageValue = 1.0f;
+						damageData.Instigator = GetOwner();
+						damageData.DamageMaker = this;
+						DamageTakerActor->TakeDamageMachine(damageData);
+					}
+					else
+					{
+						hitResult.GetActor()->Destroy();
+					}
+				}
 			}
 		}
 		else {
@@ -77,7 +101,6 @@ void ACannon::Fire()
 
 void ACannon::FireSpecial()
 {
-	//UE_LOG(LogTemp, Warning, TEXT("CountProjectile %f"), CountProjectile);
 	if (CountProjectile <= 0) {
 		GEngine->AddOnScreenDebugMessage(-1, 2.0f, FColor::Green, FString::Printf(TEXT("clip is empty")));
 		return;
